@@ -1,5 +1,10 @@
 #include "systemcalls.h"
-
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+#include<unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -15,16 +20,24 @@ bool do_system(const char *cmd)
  *  Call the system() function with the command set in the cmd
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
-*/
+*/	
+   if (cmd == NULL)
+	   return false;
+   int result = system(cmd);
+   if (result == -1)
+	   return false;
+   
+   if (WIFEXITED(result) && WEXITSTATUS(result) == 0)
+	   return true;
+   return false;
 
-    return true;
 }
 
 /**
 * @param count -The numbers of variables passed to the function. The variables are command to execute.
 *   followed by arguments to pass to the command
 *   Since exec() does not perform path expansion, the command to execute needs
-*   to be an absolute path.
+*  to be an absolute path.
 * @param ... - A list of 1 or more arguments after the @param count argument.
 *   The first is always the full path to the command to execute with execv()
 *   The remaining arguments are a list of arguments to pass to the command in execv()
@@ -49,6 +62,7 @@ bool do_exec(int count, ...)
     // and may be removed
     command[count] = command[count];
 
+
 /*
  * TODO:
  *   Execute a system command by calling fork, execv(),
@@ -58,10 +72,32 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-
+      		
     va_end(args);
+    
+    int pid;
 
-    return true;
+    fflush(stdout);
+    pid = fork();
+    if (pid == -1) {
+	    return false;
+    }
+    else if (pid == 0) {
+	    int result = execv(command[0], command);
+	    if ( result == -1)
+		    exit(-1);
+	    exit(0);
+    }
+    else {
+	    int status;
+	    if (waitpid(pid, &status,0) == -1) {
+		    return false;
+	    }
+	    if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+		    return true;
+    }
+
+    return false;
 }
 
 /**
@@ -92,8 +128,38 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-
     va_end(args);
+    fflush(stdout);
+    int fd = open(outputfile, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+    if (fd == -1)
+	    return false;
 
-    return true;
+    if (dup2(fd, 1) == -1){
+	    close(fd);
+	    return false;
+    }
+    //close(fd);
+
+    int pid;
+
+    pid = fork();
+    
+    if (pid == -1)
+	    return false;
+    else if (pid == 0) {
+	    int result = execv(command[0], command);
+	    if (result == -1)
+		    exit(-1);
+	    exit(0);
+    }
+    else {
+	    int status;
+	    if (waitpid(pid, &status, 0) == -1)
+		    return false;
+	    if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+		    return true;
+    }
+    return false;
+    
+    
 }
