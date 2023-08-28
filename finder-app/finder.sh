@@ -1,6 +1,6 @@
-#! /bin/bash
+#! /bin/sh
 
-if (($# != 2))
+if [ $# -ne 2];
 then
 	echo "invalid number of arguments"
 	echo "Usage $0 filesdir searchstr"

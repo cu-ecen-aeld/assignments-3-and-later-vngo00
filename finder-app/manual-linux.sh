@@ -38,9 +38,10 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig
     make -j 4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all
-    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
+    #make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs
-    cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}
+    cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}/:w
+
     echo "built kernel"
 fi
 
@@ -55,9 +56,10 @@ then
 fi
 
 # TODO: Create necessary base directories
+cd $OUTDIR
 mkdir rootfs
 cd rootfs
-mkdir -p bin dev etc home lib proc sbin sys tmp usr var
+mkdir -p bin dev etc home lib lib64 proc sbin sys tmp usr var
 mkdir -p usr/bin usr/lib usr/sbin
 mkdir -p var/log
 
@@ -89,12 +91,12 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 # TODO: Add library dependencies to rootfs
 
 export SYSROOT=$(aarch64-none-linux-gnu-gcc -print-sysroot)
-cd ${OUTDIR}/rootfs
-cp -a ${SYSROOT}/lib/ld-linux-aarch64.so.1 lib
-cp -a ${SYSROOT}/lib64/libc.so.6 lib64
-cp -a ${SYSROOT}/lib64/libm.so.6 lib64
-cp -a ${SYSROOT}/lib64/libresolv.so.2 lib64
+cp -L ${SYSROOT}/lib/ld-linux-aarch64.so.1 lib
+cp -L ${SYSROOT}/lib64/libc.so.6 lib64
+cp -L ${SYSROOT}/lib64/libm.so.6 lib64
+cp -L ${SYSROOT}/lib64/libresolv.so.2 lib64
 
+cd ${OUTDIR}/rootfs
 # TODO: Make device nodes
 
 sudo mknod -m 666 dev/nul c 1 3
@@ -112,7 +114,8 @@ cp ${FINDER_APP_DIR}/writer ${OUTDIR}/rootfs/home
 # on the target rootfs
 
 cp ${FINDER_APP_DIR}/finder.sh ${OUTDIR}/rootfs/home 
-cp -r ${FINDER_APP_DIR}/conf ${OUTDIR}/rootfs/home
+cp -rL ${FINDER_APP_DIR}/conf ${OUTDIR}/rootfs/home #copy dir while resovling symlinks
+cp -rL ${FINDER_APP_DIR}/conf ${OUTDIR}/rootfs
 cp ${FINDER_APP_DIR}/finder-test.sh ${OUTDIR}/rootfs/home
 cp ${FINDER_APP_DIR}/autorun-qemu.sh ${OUTDIR}/rootfs/home
 
@@ -124,8 +127,9 @@ sudo chown -R root:root *
 
 # TODO: Create initramfs.cpio.gz
 
-cd ${OUTDIR}
 find . | cpio -H newc -ov --owner root:root > ${OUTDIR}/initramfs.cpio
 
+cd ${OUTDIR}
+rm -f initramfs.cpio.gz #remove if gz file if exists
 gzip -f initramfs.cpio
 
